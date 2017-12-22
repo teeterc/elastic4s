@@ -3,7 +3,6 @@ elastic4s - Elasticsearch HTTP and TCP Scala Client
 
 [![Join the chat at https://gitter.im/sksamuel/elastic4s](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/sksamuel/elastic4s?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Build Status](https://travis-ci.org/sksamuel/elastic4s.png?branch=master)](https://travis-ci.org/sksamuel/elastic4s)
-[<img src="https://img.shields.io/maven-central/v/com.sksamuel.elastic4s/elastic4s-core_2.10.svg?label=latest%20release%20for%202.10"/>](http://search.maven.org/#search%7Cga%7C1%7Ca%3A%22elastic4s-core_2.10%22)
 [<img src="https://img.shields.io/maven-central/v/com.sksamuel.elastic4s/elastic4s-core_2.11.svg?label=latest%20release%20for%202.11"/>](http://search.maven.org/#search%7Cga%7C1%7Ca%3A%22elastic4s-core_2.11%22)
 [<img src="https://img.shields.io/maven-central/v/com.sksamuel.elastic4s/elastic4s-core_2.12.svg?label=latest%20release%20for%202.12"/>](http://search.maven.org/#search%7Cga%7C1%7Ca%3A%22elastic4s-core_2.12%22)
 
@@ -47,7 +46,10 @@ The second issue is that it uses Netty 4.1. However some popular projects such a
 
 | Elasticsearch Version | Http Client Version | Tcp Client Version |
 |-------|---------------------|--|
-|5.4.x|5.4.x|5.4.0|
+|6.0.x|6.0.x|6.0.0|
+|5.6.x|5.6.x|5.6.0|
+|5.5.x|5.5.x|5.5.5|
+|5.4.x|5.4.x|5.4.13|
 |5.3.x|5.4.x|5.3.2|
 |5.2.x|5.4.x|5.2.11|
 |5.1.x|5.4.x|5.1.5|
@@ -109,8 +111,6 @@ client you are using.
 val elastic4sVersion = "x.x.x"
 libraryDependencies ++= Seq(
   "com.sksamuel.elastic4s" %% "elastic4s-core" % elastic4sVersion,
-  // for the tcp client
-  "com.sksamuel.elastic4s" %% "elastic4s-tcp" % elastic4sVersion,
   
   // for the http client
   "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
@@ -129,75 +129,63 @@ libraryDependencies ++= Seq(
 An example is worth 1000 characters so here is a quick example of how to connect to a node with a client, create and
 index and index a one field document. Then we will search for that document using a simple text query.
 
-For this example we will use the HTTP client and the `elastic4s-circe` json serializer for converting our case classes
-into json requests. Circe support is optional, and you can use Jackson, or Json4s for example.
-
 ```scala
-import com.sksamuel.elastic4s.{ElasticsearchClientUri, TcpClient}
-import com.sksamuel.elastic4s.searches.RichSearchResponse
-import org.elasticsearch.action.support.WriteRequest.RefreshPolicy
-import org.elasticsearch.common.settings.Settings
-
-// circe
-import com.sksamuel.elastic4s.circe._
-import io.circe.generic.auto._ 
-
-case class Artist(name: String)
-
 object ArtistIndex extends App {
 
-    // spawn an embedded node for testing
-    val localNode = LocalNode(clusterName, homePath.toAbsolutePath.toString)
-    
-    // in this example we connect to the local node to get a client object
-    // in your real code you must create a client using HttpClient or TcpClient
-    // see the section on "Connecting to a cluster"
-    val client = localNode.elastic4sclient()
-    
-    // we must import the dsl
-    import com.sksamuel.elastic4s.ElasticDsl._
+  // spawn an embedded node for testing
+  val localNode = LocalNode("mycluster", "/tmp/datapath")
+
+  // in this example we create a client attached to the embedded node, but
+  // in a real application you would provide the HTTP address to the HttpClient constructor.
+  val client = localNode.http(true)
+
+  // we must import the dsl
+  import com.sksamuel.elastic4s.http.ElasticDsl._
 
   // Next we create an index in advance ready to receive documents.
   // await is a helper method to make this operation synchronous instead of async
-  // You would normally avoid doing this in a real program as it will block the calling thread
-  // but is useful when testing
+  // You would normally avoid doing this in a real program as it will block
+  // the calling thread but is useful when testing
   client.execute {
-    createIndex("bands").mappings(
-       mapping("artist") as(
-          textField("name")
-       )
+    createIndex("artists").mappings(
+      mapping("modern").fields(
+        textField("name")
+      )
     )
   }.await
 
-  // next we index a single document. Notice we can pass in the case class directly
-  // and elastic4s will marshall this for us using the circe marshaller we imported earlier.
-  // the refresh policy means that we want this document to flush to the disk immmediately.
+  // Next we index a single document which is just the name of an Artist.
+  // The RefreshPolicy.IMMEDIATE means that we want this document to flush to the disk immmediately.
   // see the section on Eventual Consistency.
-  client.execute { 
-  	indexInto("bands" / "artists") doc Artist("Coldplay") refresh(RefreshPolicy.IMMEDIATE)
+  client.execute {
+    indexInto("artists" / "modern").doc("name" -> "L.S. Lowry").refresh(RefreshPolicy.IMMEDIATE)
   }.await
 
   // now we can search for the document we just indexed
-  val resp = client.execute { 
-    search("bands" / "artists") query "coldplay" 
+  val resp = client.execute {
+    search("artists") query "lowry"
   }.await
-  
-  println("---- Search Hit Parsed ----")
-  resp.to[Artist].foreach(println)
-  
-  // pretty print the complete response
-  import io.circe.Json
-  import io.circe.parser._
-  println("---- Response as JSON ----")
-  println(decode[Json](resp.original.toString).right.get.spaces2)
-  
+
+  // resp is an Either of a RequestFailure instance containing the elasticsearch error details,
+  // or a RequestSuccess instance that depends on the type of request.
+  // In this case it is a RequestSuccess[SearchResponse]
+
+  println("---- Search Results ----")
+  resp match {
+    case Left(failure) => println("We failed " + failure.error)
+    case Right(results) => println(results.result.hits)
+  }
+
   client.close()
 }
 ```
 
 ## Eventual Consistency
 
-Elasticsearch is eventually consistent. This means when you index a document it is not normally immediately available to be searched, but queued to be flushed to the indexes on disk. By default flushing occurs every second but this can be reduced (or increased) for bulk inserts. Another option, which you saw in the quick start guide, was to set the refresh policy to `IMMEDIATE` which will force a flush straight away.
+Elasticsearch is eventually consistent. This means when you index a document it is not normally immediately available to be searched, 
+but queued to be flushed to the indexes on disk. By default flushing occurs every second but this can be reduced (or increased) for bulk inserts. 
+Another option, which you saw in the quick start guide, was to set the refresh policy to `IMMEDIATE` which will force a flush straight away.
+You shouldn't use IMMEDIATE for heavy loads as you'll cause contention with elastic constantly flushing to disk.
 
 For more in depth examples keep reading.
 
@@ -208,7 +196,7 @@ through to the readme page. For options that are not yet documented, refer to th
 
 | Operation                                 | Syntax | HTTP | TCP |
 |-------------------------------------------|--------|------|-----|
-| [Add Alias]                               | `addAlias(<alias>).on(<index>)`           | yes | yes |
+| [Add Alias]                               | `addAlias(alias, index)`                  | yes | yes |
 | [Bulk]                                    | `bulk(query1, query2, query3...)`         | yes | yes |
 | Cancel Tasks                              | `cancelTasks(<nodeIds>)`                  | yes | yes |
 | Cat Aliases                               | `catAliases()`                            | yes | |
@@ -218,6 +206,7 @@ through to the readme page. For options that are not yet documented, refer to th
 | Cat Master                                | `catMaster()`                             | yes | |
 | Cat Nodes                                 | `catNodes()`                              | yes | |
 | Cat Plugins                               | `catPlugins()`                            | yes | |
+| Cat Segments                              | `catSegments(indices)`                    | yes | |
 | Cat Shards                                | `catShards()`                             | yes | |
 | Cat Thread Pools                          | `catThreadPool()`                         | yes | |
 | Clear index cache                         | `clearCache(<index>)`                     | yes | yes |
@@ -225,28 +214,29 @@ through to the readme page. For options that are not yet documented, refer to th
 | Cluster health                            | `clusterHealth()`                         | yes | yes |
 | Cluster stats                             | `clusterStats()`                          | yes | yes |
 | [Create Index]                            | `createIndex(<name>).mappings( mapping(<name>).as( ... fields ... ) )`| yes  | yes |
-| [Create Repository]                       | `createRepository(<repo>).type(<type>)`   |   | yes |
-| [Create Snapshot]                         | `createSnapshot(<name>).in(<repo>)`       |   | yes |
-| Create Template                           | `createTemplate(<name>).pattern(<pattern>).mappings {...}`|   | yes |
-| [Delete by id]                            | `delete(<id>).from(<index> / <type>)`     | yes | yes |
-| Delete by query                           | `deleteIn(<index>).by(<query>)`           | yes | yes |
-| [Delete index]                            | `deleteIndex(<index>) [settings]`         | yes | yes |
-| [Delete Snapshot]                         | `deleteSnapshot(<name>).in(<repo>)`       |     | yes |
-| Delete Template                           | `deleteTemplate(<name>)`                  |       | yes |
+| [Create Repository]                       | `createRepository(name, type)`            | yes | yes |
+| [Create Snapshot]                         | `createSnapshot(name, repo)`              | yes | yes |
+| Create Template                           | `createTemplate(<name>).pattern(<pattern>).mappings {...}`| yes | yes |
+| [Delete by id]                            | `deleteById(index, type, id)`             | yes | yes |
+| Delete by query                           | `deleteByQuery(index, type, query)`       | yes | yes |
+| [Delete index]                            | `deleteIndex(index) [settings]`           | yes | yes |
+| [Delete Snapshot]                         | `deleteSnapshot(name, repo)`              | yes | yes |
+| Delete Template                           | `deleteTemplate(<name>)`                  | yes | yes |
+| Document Exists                           | `exists(id, index, type)`                 | yes | |
 | [Explain]                                 | `explain(<index>, <type>, <id>)`          | yes | yes |
-| Field stats                               | `fieldStats(<indexes>)`                   |   | yes |
+| Field stats                               | `fieldStats(<indexes>)`                   |     | yes |
 | Flush Index                               | `flushIndex(<index>)`                     | yes | yes |
 | [Force Merge]                             | `forceMerge(<indexes>)`                   | yes | yes |
-| [Get]                                     | `get(<id>).from(<index> / <type>)`        | yes | yes |
-| Get All Aliases                           | `getAllAliases()`                         | yes | yes |
+| [Get]                                     | `get(index, type, id)`                    | yes | yes |
+| Get All Aliases                           | `getAliases()`                            | yes | yes |
 | Get Alias                                 | `getAlias(<name>).on(<index>)`            | yes | yes |
 | Get Mapping                               | `getMapping(<index> / <type>)`            | yes | yes |
-| Get Segments                              | `getSegments(<indexes>)`                  |   | yes |
-| Get Snapshot                              | `getSnapshot <name> from <repo>`          |   | yes |
-| Get Template                              | `getTemplate(<name>)`                     |   | yes |
+| Get Segments                              | `getSegments(<indexes>)`                  | yes | yes |
+| Get Snapshot                              | `getSnapshot(name, repo)`                 | yes | yes |
+| Get Template                              | `getTemplate(<name>)`                     | yes | yes |
 | [Index]                                   | `indexInto(<index> / <type>).doc(<doc>)`  | yes | yes |
 | Index exists                              | `indexExists(<name>)`                     | yes | yes |
-| Index Status                              | `indexStatus(<index>)`                    |   | yes |
+| Index stats                               | `indexStats(indices)`                     | yes | |
 | List Tasks                                | `listTasks(nodeIds)`                      | yes | yes |
 | Lock Acquire                              | `acquireGlobalLock()`                     | yes | |
 | Lock Release                              | `releaseGlobalLock()`                     | yes | |
@@ -260,12 +250,13 @@ through to the readme page. For options that are not yet documented, refer to th
 | Refresh index                             | `refreshIndex(<name>)`                    | yes | yes |
 | Register Query                            | `register(<query>).into(<index> / <type>, <field>)` |   | yes |
 | [Remove Alias]                            | `removeAlias(<alias>).on(<index>)`        | yes | yes |
-| [Restore Snapshot]                        | `restoreSnapshot(<name>).from(<repo>)`    |   | yes |
-| [Search]                                  | `search(<index> / <type>).query(<query>)` | yes | yes |
+| [Restore Snapshot]                        | `restoreSnapshot(name, repo)`             | yes | yes |
+| [Search]                                  | `search(index).query(<query>)`            | yes | yes |
 | Search scroll                             | `searchScroll(<scrollId>)`                | yes | yes |
 | Term Vectors                              | `termVectors(<index>, <type>, <id>)`      | yes | yes |
 | Type Exists                               | `typesExists(<types>) in <index>`         | yes | yes |
-| [Update]                                  | `update(<id>).in(<index> / <type>)`       | yes  | yes |
+| [Update By Id]                            | `updateById(index, type, id)`             | yes | yes |
+| Update by query                           | `updateByQuery(index, type, query)`       | yes | yes |
 | [Validate]                                | `validateIn(<index/type>).query(<query>)` | yes | yes |
 
 Please also note [some java interoperability notes](https://sksamuel.github.io/elastic4s/docs/misc/javainterop.html).
@@ -869,10 +860,62 @@ folder. There is no need to configure anything externally.
 
 ## Changelog
 
-###### 6.0.0 - Pre-release
+###### 6.1.1
+
+* Added index stats API
+* Added cats segments API
+* Fix: support update of sequences and nested fields #1193
+* Fix: Address aws normalized uri encoding #1188
+* Added raw source in search requests
+* Added profile option to search requests
+* Add GeoBoundsAggregationBuilder #1189
+* Add support for stored scripts #1183
+* Refactored geo shape query model to support multiple shapes #1187
+* Fix: unchecked matches in XContentBuilder #1184
+* Add derivative aggregation builder #1179
+* Added explicit 'not implemented' errors to aggregation and query builder functions #1181
+* Added terms lookup query support in http client #1182
+* Range aggregation support #1175
+* Added Bucket script pipeline aggs #1177
+
+###### 6.1.0
+
+* Bumped wire version to elasticseach 6.1.0
+* Updated terms agg to support regex  #1174
+* Updated range and date queries to use elastic date math #1170
+* Wrapping apache client errors in JavaRestClientExceptionWrapper so we know which client caused them #1165
+* Added AggReader derivation for Circe module
+* Fixed completion suggestion option #1173
+* Add multi criteria order in term aggregation #1172
+* Added sum bucket agg for http. #1164
+* Add ExecutionContext param to execute (with default value) #1167
+* Stored scripts fix #1162
+
+###### 6.0.4
+
+* Added to[T] and safeTo[T] on aggregations #1156
+* Added _shard, _node, and _routing to search hit #1160
+* java.lang.NullPointerException in ElasticError.parse #1159
+ 
+###### 6.0.3
+
+* Added track_total_hits option to searches
+* Added get segment to http api
+
+###### 6.0.2
+
+* Added snapshots and repositories to the http api
+
+###### 6.0.1
+
+* Added document exists api #1155
+* Fix partitioned terms aggregation (fixes  #1153)
+
+###### 6.0.0
 
 * HTTP Client should now be the first choice client. The TCP Client has been deprecated as it will be removed in version 7 of elasticsearch itself. See https://www.elastic.co/blog/elasticsearch-5-6-0-released. Specifically, _HTTP client will become the official way for Java applications to communicate with Elasticsearch, replacing the Transport Client, which will be removed in Elasticsearch 7.0._.
 * HTTP Client no longer has a dependency on the main elasticsearch jars - no more version clashes (netty!) and a hugely reduced footprint.
+* HTTP operations now return Either[RequestFailure, RequestSuccess[U]] for better error handling. Each of `RequestFailure` and `RequestSuccess` contain the http status code, the full json response body, and any http headers, in addition to either the error details or the request resposne type.
 * Any methods deprecated before version 5.0.0 have been removed.
 * Operations that accept an index and a type have been deprecated in favour of index only operations. This is because Elasticsearch plan to remove types in version 7, and in version 6 you are limited to a single type per index. See - https://www.elastic.co/blog/elasticsearch-6-0-0-alpha1-released 
 * Deprecated implicit conversion of a tuple to an index/type has been removed. So instead of "index" -> "type", you should use "index" / "type", which has been the default since 2.4.0. Or even better, don't use the type at all anymore, see point above.
@@ -881,7 +924,6 @@ folder. There is no need to configure anything externally.
 * Reworked the HTTP aggregation response API to support better types and subaggs
 * disableCoord has been removed from bool and common term queries
 * Added getIndex request type
-* The common operations now return Either[RequestFailure, Response] for better error handling. The other request types will be changed to this style as part of future releases.
 * `getAliases` is now overloaded to accept seq of Index and Alias objects to make it clearer how it works. The existing `getAlias` is deprecated.
 * date_range, and extended_stats aggregations have been implemented for the http client
 * Added aliases when creating indexes

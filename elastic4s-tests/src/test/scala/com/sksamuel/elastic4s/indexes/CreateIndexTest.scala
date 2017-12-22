@@ -49,7 +49,7 @@ class CreateIndexTest extends WordSpec with Matchers with DiscoveryLocalNodeProv
         ).shards(1).waitForActiveShards(1)
       }.await
 
-      resp.right.get.acknowledged shouldBe true
+      resp.right.get.result.acknowledged shouldBe true
     }
 
     "return error object when index already exists" in {
@@ -63,7 +63,7 @@ class CreateIndexTest extends WordSpec with Matchers with DiscoveryLocalNodeProv
       }.await
 
       resp.left.get.error.`type` shouldBe "resource_already_exists_exception"
-      resp.left.get.error.index shouldBe "foo"
+      resp.left.get.error.index shouldBe Some("foo")
     }
 
     "create from raw source" in {
@@ -82,7 +82,7 @@ class CreateIndexTest extends WordSpec with Matchers with DiscoveryLocalNodeProv
               }
              }
            """).shards(1).waitForActiveShards(1)
-      }.await.right.get.acknowledged shouldBe true
+      }.await.right.get.result.acknowledged shouldBe true
     }
   }
 

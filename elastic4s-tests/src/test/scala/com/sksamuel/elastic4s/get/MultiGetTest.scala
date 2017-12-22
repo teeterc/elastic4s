@@ -28,10 +28,10 @@ class MultiGetTest extends FlatSpec with MockitoSugar with ElasticDsl with Disco
 
   http.execute(
     bulk(
-      indexInto("coldplay" / "albums") id 1 fields("name" -> "parachutes", "year" -> 2000),
-      indexInto("coldplay" / "albums") id 3 fields("name" -> "x&y", "year" -> 2005),
-      indexInto("coldplay" / "albums") id 5 fields("name" -> "mylo xyloto", "year" -> 2011),
-      indexInto("coldplay" / "albums") id 7 fields("name" -> "ghost stories", "year" -> 2015)
+      indexInto("coldplay" / "albums") id "1" fields("name" -> "parachutes", "year" -> 2000),
+      indexInto("coldplay" / "albums") id "3" fields("name" -> "x&y", "year" -> 2005),
+      indexInto("coldplay" / "albums") id "5" fields("name" -> "mylo xyloto", "year" -> 2011),
+      indexInto("coldplay" / "albums") id "7" fields("name" -> "ghost stories", "year" -> 2015)
     ).refresh(RefreshPolicy.Immediate)
   ).await
 
@@ -39,11 +39,11 @@ class MultiGetTest extends FlatSpec with MockitoSugar with ElasticDsl with Disco
 
     val resp = http.execute(
       multiget(
-        get(3).from("coldplay/albums"),
-        get(5) from "coldplay/albums",
-        get(7) from "coldplay/albums"
+        get("3").from("coldplay/albums"),
+        get("5") from "coldplay/albums",
+        get("7") from "coldplay/albums"
       )
-    ).await
+    ).await.right.get.result
 
     resp.size shouldBe 3
 
@@ -61,10 +61,10 @@ class MultiGetTest extends FlatSpec with MockitoSugar with ElasticDsl with Disco
 
     val resp = http.execute(
       multiget(
-        get(3).from("coldplay/albums"),
-        get(711111) from "coldplay/albums"
+        get("3").from("coldplay/albums"),
+        get("711111") from "coldplay/albums"
       )
-    ).await
+    ).await.right.get.result
 
     resp.size shouldBe 2
     resp.items.head.exists shouldBe true
@@ -75,10 +75,10 @@ class MultiGetTest extends FlatSpec with MockitoSugar with ElasticDsl with Disco
 
     val resp = http.execute(
       multiget(
-        get(3) from "coldplay/albums" storedFields("name", "year"),
-        get(5) from "coldplay/albums" storedFields "name"
+        get("3") from "coldplay/albums" storedFields("name", "year"),
+        get("5") from "coldplay/albums" storedFields "name"
       )
-    ).await
+    ).await.right.get.result
 
     resp.size shouldBe 2
     resp.items.head.fields shouldBe Map("year" -> List(2005), "name" -> List("x&y"))
@@ -89,10 +89,10 @@ class MultiGetTest extends FlatSpec with MockitoSugar with ElasticDsl with Disco
 
     val resp = http.execute(
       multiget(
-        get(3) from "coldplay/albums" fetchSourceContext Seq("name", "year"),
-        get(5) from "coldplay/albums" fetchSourceContext Seq("name")
+        get("3") from "coldplay/albums" fetchSourceContext Seq("name", "year"),
+        get("5") from "coldplay/albums" fetchSourceContext Seq("name")
       )
-    ).await
+    ).await.right.get.result
     resp.size shouldBe 2
     resp.items.head.source shouldBe Map("year" -> 2005, "name" -> "x&y")
     resp.items.last.source shouldBe Map("name" -> "mylo xyloto")

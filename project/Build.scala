@@ -11,19 +11,30 @@ object Build extends AutoPlugin {
   object autoImport {
     val org = "com.sksamuel.elastic4s"
     val AkkaVersion = "2.4.20"
-    val CatsVersion = "1.0.0-RC1"
-    val CirceVersion = "0.9.0-M2"
+    val CatsVersion = "1.0.0-RC2"
+    val CirceVersion = "0.9.0-M3"
     val CommonsIoVersion = "2.4"
+<<<<<<< HEAD
     val ElasticsearchVersion = "5.6.3"
     val ExtsVersion = "1.57.1"
     val JacksonVersion = "2.9.1"
+=======
+    val ElasticsearchVersion = "6.1.1"
+    val ExtsVersion = "1.60.0"
+    val JacksonVersion = "2.9.2"
+>>>>>>> master
     val Json4sVersion = "3.5.3"
-    val SprayJsonVersion = "1.3.3"
+    val SprayJsonVersion = "1.3.4"
+    val AWSJavaSdkVersion = "1.11.253"
     val Log4jVersion = "2.9.1"
+<<<<<<< HEAD
     val LuceneVersion = "6.6.1"
+=======
+    val LuceneVersion = "7.1.0"
+>>>>>>> master
     val MockitoVersion = "1.9.5"
-    val PlayJsonVersion = "2.6.6"
-    val ReactiveStreamsVersion = "1.0.0"
+    val PlayJsonVersion = "2.6.7"
+    val ReactiveStreamsVersion = "1.0.2"
     val ScalatestVersion = "3.0.4"
     val Slf4jVersion = "1.7.25"
   }
@@ -36,8 +47,8 @@ object Build extends AutoPlugin {
     ivyConfigurations += config("compileonly").hide,
     // appending everything from 'compileonly' to unmanagedClasspath
     unmanagedClasspath in Compile ++= update.value.select(configurationFilter("compileonly")),
-    scalaVersion := "2.11.11",
-    crossScalaVersions := Seq("2.11.11", "2.12.3"),
+    scalaVersion := "2.11.12",
+    crossScalaVersions := Seq("2.11.12", "2.12.4"),
     publishMavenStyle := true,
     resolvers += Resolver.mavenLocal,
     resolvers += Resolver.url("https://artifacts.elastic.co/maven"),

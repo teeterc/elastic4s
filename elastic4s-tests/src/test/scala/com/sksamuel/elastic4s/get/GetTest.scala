@@ -44,7 +44,7 @@ class GetTest extends FlatSpec with Matchers with ElasticDsl with DiscoveryLocal
 
     val resp = http.execute {
       get("8") from "beer"
-    }.await.right.get
+    }.await.right.get.result
 
     resp.exists shouldBe true
     resp.id shouldBe "8"
@@ -54,7 +54,7 @@ class GetTest extends FlatSpec with Matchers with ElasticDsl with DiscoveryLocal
 
     val resp = http.execute {
       get("8") from "beer"
-    }.await.right.get
+    }.await.right.get.result
 
     resp.exists shouldBe true
     resp.id shouldBe "8"
@@ -65,7 +65,7 @@ class GetTest extends FlatSpec with Matchers with ElasticDsl with DiscoveryLocal
 
     val resp = http.execute {
       get("8") from "beer/lager" fetchSourceContext false
-    }.await.right.get
+    }.await.right.get.result
 
     resp.exists should be(true)
     resp.id shouldBe "8"
@@ -77,7 +77,7 @@ class GetTest extends FlatSpec with Matchers with ElasticDsl with DiscoveryLocal
 
     val resp = http.execute {
       get("8") from "beer/lager" fetchSourceInclude "brand"
-    }.await.right.get
+    }.await.right.get.result
 
     resp.exists should be(true)
     resp.id shouldBe "8"
@@ -88,7 +88,7 @@ class GetTest extends FlatSpec with Matchers with ElasticDsl with DiscoveryLocal
 
     val resp = http.execute {
       get("8") from "beer/lager" fetchSourceExclude "brand"
-    }.await.right.get
+    }.await.right.get.result
 
     resp.exists should be(true)
     resp.id shouldBe "8"
@@ -99,7 +99,7 @@ class GetTest extends FlatSpec with Matchers with ElasticDsl with DiscoveryLocal
 
     val resp = http.execute {
       get("8") from "beer/lager" fetchSourceContext(List("name"), List("brand"))
-    }.await.right.get
+    }.await.right.get.result
 
     resp.exists should be(true)
     resp.id shouldBe "8"
@@ -110,7 +110,7 @@ class GetTest extends FlatSpec with Matchers with ElasticDsl with DiscoveryLocal
 
     val resp = http.execute {
       get("4") from "beer/lager" storedFields("name", "brand")
-    }.await.right.get
+    }.await.right.get.result
 
     resp.exists should be(true)
     resp.id shouldBe "4"
@@ -122,7 +122,7 @@ class GetTest extends FlatSpec with Matchers with ElasticDsl with DiscoveryLocal
 
     val resp = http.execute {
       get("4") from "beer/lager" storedFields "ingredients"
-    }.await.right.get
+    }.await.right.get.result
 
     val field = resp.storedField("ingredients")
     field.values shouldBe Seq("hops", "barley", "water", "yeast")
@@ -137,6 +137,6 @@ class GetTest extends FlatSpec with Matchers with ElasticDsl with DiscoveryLocal
   it should "return Right with exists=false when the doc does not exist" in {
     http.execute {
       get("111111") from "beer"
-    }.await.right.get.exists shouldBe false
+    }.await.right.get.result.exists shouldBe false
   }
 }

@@ -26,6 +26,7 @@ import com.sksamuel.elastic4s.searches.queries.funcscorer.ScoreApi
 import com.sksamuel.elastic4s.searches.sort.SortApi
 import com.sksamuel.elastic4s.searches.suggestion.SuggestionApi
 import com.sksamuel.elastic4s.settings.SettingsApi
+import com.sksamuel.elastic4s.snapshots.SnapshotApi
 import com.sksamuel.elastic4s.task.TaskApi
 import com.sksamuel.elastic4s.termvectors.TermVectorApi
 import com.sksamuel.elastic4s.update.UpdateApi
@@ -49,6 +50,7 @@ trait ElasticApi
     with DeleteApi
     with DeleteIndexApi
     with DynamicTemplateApi
+    with ExistsApi
     with ExplainApi
     with ForceMergeApi
     with GetApi
@@ -70,6 +72,7 @@ trait ElasticApi
     with SearchApi
     with SearchTemplateApi
     with SettingsApi
+    with SnapshotApi
     with SortApi
     with SuggestionApi
     with TaskApi

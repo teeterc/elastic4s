@@ -10,21 +10,12 @@ import org.elasticsearch.action.admin.indices.open.OpenIndexResponse
 import org.elasticsearch.action.admin.indices.refresh.RefreshResponse
 import org.elasticsearch.action.admin.indices.rollover.RolloverResponse
 import org.elasticsearch.action.admin.indices.segments.IndicesSegmentResponse
-import org.elasticsearch.action.admin.indices.shrink.ShrinkResponse
 import org.elasticsearch.action.admin.indices.stats.IndicesStatsResponse
 import org.elasticsearch.client.Client
 
 import scala.concurrent.Future
 
 trait IndexAdminExecutables {
-
-  implicit object ShrinkDefinitionExecutable
-    extends Executable[ShrinkDefinition, ShrinkResponse, ShrinkResponse] {
-    override def apply(c: Client, t: ShrinkDefinition): Future[ShrinkResponse] = {
-      val builder = ShrinkBuilderFn(c, t)
-      injectFuture(builder.execute(_))
-    }
-  }
 
   implicit object OpenIndexDefinitionExecutable
     extends Executable[OpenIndexDefinition, OpenIndexResponse, OpenIndexResponse] {
@@ -70,9 +61,9 @@ trait IndexAdminExecutables {
   }
 
   implicit object IndicesStatsDefinitionExecutable
-    extends Executable[IndicesStatsDefinition, IndicesStatsResponse, IndicesStatsResult] {
-    override def apply(c: Client, t: IndicesStatsDefinition): Future[IndicesStatsResult] = {
-      injectFutureAndMap(c.admin.indices.prepareStats(t.indexes.values: _*).execute)(IndicesStatsResult.apply)
+    extends Executable[IndexStatsRequest, IndicesStatsResponse, IndicesStatsResult] {
+    override def apply(c: Client, t: IndexStatsRequest): Future[IndicesStatsResult] = {
+      injectFutureAndMap(c.admin.indices.prepareStats(t.indices.values: _*).execute)(IndicesStatsResult.apply)
     }
   }
 

@@ -12,13 +12,14 @@ import com.sksamuel.elastic4s.http.explain.ExplainImplicits
 import com.sksamuel.elastic4s.http.get.GetImplicits
 import com.sksamuel.elastic4s.http.index.admin.IndexAdminImplicits
 import com.sksamuel.elastic4s.http.index.mappings.MappingExecutables
-import com.sksamuel.elastic4s.http.index.{IndexImplicits, IndexTemplateImplicits}
+import com.sksamuel.elastic4s.http.index.{ExistsImplicits, IndexImplicits, IndexStatsImplicits, IndexTemplateImplicits}
 import com.sksamuel.elastic4s.http.locks.LocksImplicits
 import com.sksamuel.elastic4s.http.nodes.NodesImplicits
 import com.sksamuel.elastic4s.http.reindex.ReindexImplicits
 import com.sksamuel.elastic4s.http.search.template.SearchTemplateImplicits
 import com.sksamuel.elastic4s.http.search.{SearchImplicits, SearchScrollImplicits}
 import com.sksamuel.elastic4s.http.settings.SettingsImplicits
+import com.sksamuel.elastic4s.http.snapshots.SnapshotHttpImplicits
 import com.sksamuel.elastic4s.http.task.TaskImplicits
 import com.sksamuel.elastic4s.http.termvectors.TermVectorsExecutables
 import com.sksamuel.elastic4s.http.update.UpdateImplicits
@@ -33,11 +34,13 @@ trait ElasticDsl
     with CountImplicits
     with ClusterImplicits
     with DeleteImplicits
+    with ExistsImplicits
     with ExplainImplicits
     with GetImplicits
     with IndexImplicits
     with IndexAdminImplicits
     with IndexAliasImplicits
+    with IndexStatsImplicits
     with IndexTemplateImplicits
     with LocksImplicits
     with MappingExecutables
@@ -47,6 +50,7 @@ trait ElasticDsl
     with SearchTemplateImplicits
     with SearchScrollImplicits
     with SettingsImplicits
+    with SnapshotHttpImplicits
     with UpdateImplicits
     with TaskImplicits
     with TermVectorsExecutables

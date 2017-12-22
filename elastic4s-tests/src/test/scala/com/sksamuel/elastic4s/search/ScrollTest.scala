@@ -50,28 +50,28 @@ class ScrollTest extends WordSpec with Matchers with ElasticDsl with DiscoveryLo
           .limit(2)
           .sortBy(fieldSort("name"))
           .storedFields("name")
-      }.await.right.get
+      }.await.right.get.result
       resp1.hits.hits.map(_.storedField("name").value).toList shouldBe List("top of the city", "cloudbusting")
 
       val resp2 = http.execute {
         searchScroll(resp1.scrollId.get).keepAlive("1m")
       }.await
-      resp2.right.get.hits.hits.map(_.storedField("name").value).toList shouldBe List("dream of sheep", "hello earth")
+      resp2.right.get.result.hits.hits.map(_.storedField("name").value).toList shouldBe List("dream of sheep", "hello earth")
 
       val resp3 = http.execute {
-        searchScroll(resp2.right.get.scrollId.get).keepAlive("1m")
+        searchScroll(resp2.right.get.result.scrollId.get).keepAlive("1m")
       }.await
-      resp3.right.get.hits.hits.map(_.storedField("name").value).toList shouldBe List("hounds of love", "under ice")
+      resp3.right.get.result.hits.hits.map(_.storedField("name").value).toList shouldBe List("hounds of love", "under ice")
 
       val resp4 = http.execute {
-        searchScroll(resp3.right.get.scrollId.get).keepAlive("1m")
+        searchScroll(resp3.right.get.result.scrollId.get).keepAlive("1m")
       }.await
-      resp4.right.get.hits.hits.map(_.storedField("name").value).toList shouldBe List("jig of life", "watching you watching me")
+      resp4.right.get.result.hits.hits.map(_.storedField("name").value).toList shouldBe List("jig of life", "watching you watching me")
 
       val resp5 = http.execute {
-        searchScroll(resp4.right.get.scrollId.get)
+        searchScroll(resp4.right.get.result.scrollId.get)
       }.await
-      resp5.right.get.hits.hits.map(_.storedField("name").value).toList shouldBe List("waking the watch")
+      resp5.right.get.result.hits.hits.map(_.storedField("name").value).toList shouldBe List("waking the watch")
     }
     "return an error if the scroll id doesn't parse" in {
       val resp = http.execute {
@@ -96,12 +96,12 @@ class ScrollTest extends WordSpec with Matchers with ElasticDsl with DiscoveryLo
           .limit(2)
           .sortBy(fieldSort("name"))
           .storedFields("name")
-      }.await.right.get
+      }.await.right.get.result
 
       val resp2 = http.execute {
         searchScroll(resp1.scrollId.get).keepAlive(1.minute)
       }.await
-      resp2.right.get.hits.hits.map(_.storedField("name").value).toList shouldBe List("dream of sheep", "hello earth")
+      resp2.right.get.result.hits.hits.map(_.storedField("name").value).toList shouldBe List("dream of sheep", "hello earth")
     }
   }
 
@@ -114,7 +114,7 @@ class ScrollTest extends WordSpec with Matchers with ElasticDsl with DiscoveryLo
           .scroll("1m")
           .limit(4)
           .storedFields("name")
-      }.await.right.get
+      }.await.right.get.result
 
       val resp2 = http.execute {
         searchScroll(resp1.scrollId.get).keepAlive(1.minute)
@@ -127,15 +127,15 @@ class ScrollTest extends WordSpec with Matchers with ElasticDsl with DiscoveryLo
           .scroll("1m")
           .limit(4)
           .storedFields("name")
-      }.await.right.get
+      }.await.right.get.result
 
       val resp4 = http.execute {
         searchScroll(resp3.scrollId.get).keepAlive(1.minute)
       }.await
 
-      (resp1.hits.hits.length + resp2.right.get.hits.hits.length) shouldBe 4
-      (resp3.hits.hits.length + resp4.right.get.hits.hits.length) shouldBe 5
-      val merged = Seq(resp1.hits.hits, resp3.hits.hits, resp2.right.get.hits.hits, resp4.right.get.hits.hits).flatMap(resp => resp.map(_.storedField("name").value.asInstanceOf[String])).toList.distinct
+      (resp1.hits.hits.length + resp2.right.get.result.hits.hits.length) shouldBe 4
+      (resp3.hits.hits.length + resp4.right.get.result.hits.hits.length) shouldBe 5
+      val merged = Seq(resp1.hits.hits, resp3.hits.hits, resp2.right.get.result.hits.hits, resp4.right.get.result.hits.hits).flatMap(resp => resp.map(_.storedField("name").value.asInstanceOf[String])).toList.distinct
       merged.length shouldBe 9
       merged.max shouldBe "watching you watching me"
       merged.min shouldBe "cloudbusting"
@@ -154,18 +154,18 @@ class ScrollTest extends WordSpec with Matchers with ElasticDsl with DiscoveryLo
 
       val resp1 = http.execute {
         searchDefinition
-      }.await.right.get
+      }.await.right.get.result
 
       val resp2 = http.execute {
         searchDefinition
-      }.await.right.get
+      }.await.right.get.result
 
       val resp = http.execute {
         clearScroll(resp1.scrollId.get, resp2.scrollId.get)
       }.await
 
-      resp.right.get.succeeded should be(true)
-      resp.right.get.num_freed should be > 0
+      resp.right.get.result.succeeded should be(true)
+      resp.right.get.result.num_freed should be > 0
     }
     "return an error if the scroll id doesn't parse" in {
       val resp = http.execute {

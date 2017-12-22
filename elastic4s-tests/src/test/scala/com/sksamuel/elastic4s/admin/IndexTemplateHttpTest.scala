@@ -6,7 +6,12 @@ import com.sksamuel.elastic4s.testkit.DiscoveryLocalNodeProvider
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Matchers, WordSpec}
 
-class IndexTemplateHttpTest extends WordSpec with MockitoSugar with ElasticDsl with Matchers with DiscoveryLocalNodeProvider {
+class IndexTemplateHttpTest
+  extends WordSpec
+    with MockitoSugar
+    with ElasticDsl
+    with Matchers
+    with DiscoveryLocalNodeProvider {
 
   "create template" should {
     "be stored" in {
@@ -17,14 +22,14 @@ class IndexTemplateHttpTest extends WordSpec with MockitoSugar with ElasticDsl w
             doubleField("year_founded")
           )
         )
-      }.await.right.get.acknowledged shouldBe true
+      }.await.right.get.result.acknowledged shouldBe true
     }
     "be retrievable" in {
       val resp = http.execute {
         getIndexTemplate("brewery_template")
       }.await
-      resp.right.get.templateFor("brewery_template").indexPatterns shouldBe Seq("brew*")
-      resp.right.get.templateFor("brewery_template").order shouldBe 0
+      resp.right.get.result.templateFor("brewery_template").indexPatterns shouldBe Seq("brew*")
+      resp.right.get.result.templateFor("brewery_template").order shouldBe 0
     }
     "return error if the template has invalid parameters" in {
       http.execute {
@@ -53,7 +58,7 @@ class IndexTemplateHttpTest extends WordSpec with MockitoSugar with ElasticDsl w
       // check that the document was indexed
       http.execute {
         search("brewers") query termQuery("year_founded", 1829)
-      }.await.right.get.totalHits shouldBe 1
+      }.await.right.get.result.totalHits shouldBe 1
 
       // the mapping for this index should match the template
       //   val properties = http.execute {

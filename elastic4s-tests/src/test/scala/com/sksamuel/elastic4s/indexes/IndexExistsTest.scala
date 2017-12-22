@@ -24,12 +24,12 @@ class IndexExistsTest extends WordSpec with Matchers with ElasticDsl with Discov
     "return true for an existing index" in {
       http.execute {
         indexExists("indexexists")
-      }.await.isExists shouldBe true
+      }.await.right.get.result.isExists shouldBe true
     }
     "return false for non existing index" in {
       http.execute {
         indexExists("qweqwewqe")
-      }.await.isExists shouldBe false
+      }.await.right.get.result.isExists shouldBe false
     }
   }
 }

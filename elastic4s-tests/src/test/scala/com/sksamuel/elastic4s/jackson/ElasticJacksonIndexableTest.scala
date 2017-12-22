@@ -19,9 +19,9 @@ class ElasticJacksonIndexableTest extends WordSpec with Matchers with DiscoveryL
 
       http.execute {
         bulk(
-          indexInto("jacksontest" / "characters").source(Character("tyrion", "game of thrones")).withId(1),
-          indexInto("jacksontest" / "characters").source(Character("hank", "breaking bad")).withId(2),
-          indexInto("jacksontest" / "characters").source(Location("dorne", "game of thrones")).withId(3)
+          indexInto("jacksontest" / "characters").source(Character("tyrion", "game of thrones")).withId("1"),
+          indexInto("jacksontest" / "characters").source(Character("hank", "breaking bad")).withId("2"),
+          indexInto("jacksontest" / "characters").source(Location("dorne", "game of thrones")).withId("3")
         ).refresh(RefreshPolicy.WaitFor)
       }.await
     }
@@ -29,7 +29,7 @@ class ElasticJacksonIndexableTest extends WordSpec with Matchers with DiscoveryL
 
       val resp = http.execute {
         search("jacksontest" / "characters").query("breaking")
-      }.await.right.get
+      }.await.right.get.result
       resp.to[Character] shouldBe List(Character("hank", "breaking bad"))
 
     }
@@ -37,7 +37,7 @@ class ElasticJacksonIndexableTest extends WordSpec with Matchers with DiscoveryL
 
       val resp = http.execute {
         search("jacksontest" / "characters").query("breaking")
-      }.await.right.get
+      }.await.right.get.result
 
       // should populate _id, _index and _type for us from the search result
       resp.safeTo[CharacterWithIdTypeAndIndex] shouldBe
@@ -55,7 +55,7 @@ class ElasticJacksonIndexableTest extends WordSpec with Matchers with DiscoveryL
 
       val resp = http.execute {
         search("jacksontest" / "characters").query("breaking")
-      }.await.right.get
+      }.await.right.get.result
 
       // if our custom mapper has been picked up, then it should throw an exception when deserializing
       intercept[JsonMappingException] {

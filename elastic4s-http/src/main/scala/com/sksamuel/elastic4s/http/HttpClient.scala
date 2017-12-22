@@ -1,5 +1,7 @@
 package com.sksamuel.elastic4s.http
 
+import java.io.{File, InputStream}
+
 import cats.Show
 import com.sksamuel.elastic4s.ElasticsearchClientUri
 import com.sksamuel.exts.Logging
@@ -7,12 +9,38 @@ import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
 import org.elasticsearch.client.RestClientBuilder.{HttpClientConfigCallback, RequestConfigCallback}
 
-import scala.concurrent.{Future, Promise}
-import scala.util.{Failure, Success}
+import scala.concurrent.{ExecutionContext, Future}
+
+sealed trait Response[+U] {
+  def status: Int // the http status code of the response
+  def body: Option[String] // the http response body if the response included one
+  def headers: Map[String, String] // any http headers included in the response
+  def result: U // returns the marshalled response U or throws an exception
+  def error: ElasticError // returns the error or throw an exception
+  def isError: Boolean // returns true if this is an error response
+  final def isSuccess: Boolean  = !isError // returns true if this is a success
+  final def map[V](f: U => V): Option[V] = if (isError) None else Some(f(result))
+  final def fold[V](ifError: => V)(f: U => V): V = if (isError) ifError else f(result)
+  final def foreach[V](f: U => V) = if (!isError) f(result)
+}
+
+case class RequestSuccess[U](override val status: Int, // the http status code of the response
+                             override val body: Option[String], // the http response body if the response included one
+                             override val headers: Map[String, String], // any http headers included in the response
+                             override val result: U) extends Response[U] {
+  override def isError = false
+  override def error = throw new NoSuchElementException(s"Request success $result")
+}
+
+case class RequestFailure(override val status: Int, // the http status code of the response
+                          override val body: Option[String], // the http response body if the response included one
+                          override val headers: Map[String, String], // any http headers included in the response
+                          override val error: ElasticError) extends Response[Nothing] {
+  override def result = throw new NoSuchElementException(s"Request Failure $error")
+  override def isError = true
+}
 
 trait HttpClient extends Logging {
-
-  import scala.concurrent.ExecutionContext.Implicits.global
 
   // the underlying client that performs the requests
   def client: HttpRequestClient
@@ -25,21 +53,19 @@ trait HttpClient extends Logging {
     */
   def show[T](request: T)(implicit show: Show[T]): String = show.show(request)
 
-  // Executes the given request type T, and returns a Future of the response type U.
-  def execute[T, U](request: T)(implicit exec: HttpExecutable[T, U]): Future[U] = {
-    val p = Promise[U]()
-    val f = exec.execute(client, request)
-    f.onComplete {
-      case Success(r) => p.tryComplete(exec.responseHandler.handle(r))
-      case Failure(t) => p.tryFailure(t)
-    }
-    p.future
+  // Executes the given request type T, and returns a Future of Response[U] where U is particular to the request type.
+  // For example a search request will return a Future[Response[SearchResponse]].
+  // The returned Response is an ADT
+  def execute[T, U](request: T)(implicit exec: HttpExecutable[T, U],
+                                executionContext: ExecutionContext = ExecutionContext.Implicits.global): Future[Either[RequestFailure, RequestSuccess[U]]] = {
+    exec.execute(client, request)
+      .map(r => exec.responseHandler.handle(r) match {
+        case Right(u) =>
+          Right(RequestSuccess(r.statusCode, r.entity.map(_.content), r.headers, u))
+        case Left(error) =>
+          Left(RequestFailure(r.statusCode, r.entity.map(_.content), r.headers, error))
+      })
   }
-
-  // executes the given request and returns a Future with the raw HttpResponse
-  // this variant should be used if you need access to the underlying json and status code,
-  // rather than a strongly typed object returned by the normal execute(req) method.
-  def executeRaw[T](request: T)(implicit exec: HttpExecutable[T, _]): Future[HttpResponse] = exec.execute(client, request)
 
   def close(): Unit
 }
@@ -68,11 +94,15 @@ trait HttpRequestClient extends Logging {
   def close(): Unit
 }
 
-case class HttpResponse(statusCode: Int, entity: Option[HttpEntity], headers: Map[String, String])
-case class HttpEntity(content: String, contentType: Option[String])
+case class HttpResponse(statusCode: Int, entity: Option[HttpEntity.StringEntity], headers: Map[String, String])
+sealed trait HttpEntity
 object HttpEntity {
   def apply(content: String): HttpEntity = HttpEntity(content, "application/json; charset=utf-8")
-  def apply(content: String, contentType: String): HttpEntity = HttpEntity(content, Some(contentType))
+  def apply(content: String, contentType: String): HttpEntity = StringEntity(content, Some(contentType))
+
+  case class StringEntity(content: String, contentType: Option[String]) extends HttpEntity
+  case class InputStreamEntity(content: InputStream, contentType: Option[String]) extends HttpEntity
+  case class FileEntity(content: File, contentType: Option[String]) extends HttpEntity
 }
 
 object HttpClient extends Logging {

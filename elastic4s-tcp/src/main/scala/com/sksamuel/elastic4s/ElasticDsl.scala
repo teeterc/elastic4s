@@ -15,6 +15,7 @@ import com.sksamuel.elastic4s.indexes.admin.IndexRecoveryDefinition
 import com.sksamuel.elastic4s.mappings.FieldType._
 import com.sksamuel.elastic4s.mappings._
 import com.sksamuel.elastic4s.reindex.ReindexExecutables
+import com.sksamuel.elastic4s.snapshots.SnapshotApi
 import com.sksamuel.elastic4s.script.ScriptDefinition
 import com.sksamuel.elastic4s.search.{ScrollExecutables, SearchImplicits}
 import com.sksamuel.elastic4s.searches._
@@ -35,7 +36,6 @@ import scala.language.implicitConversions
 trait ElasticDsl
   extends ElasticApi
     with PercolateDsl
-    with SnapshotDsl
     with TokenFilterDsl
     with AliasExecutables
     with BulkExecutables
@@ -55,6 +55,7 @@ trait ElasticDsl
     with ScrollExecutables
     with SearchImplicits
     with SettingsExecutables
+    with SnapshotImplicits
     with TaskExecutables
     with TermVectorsExecutables
     with UpdateExecutables
@@ -310,10 +311,10 @@ trait ElasticDsl
     def into(indexType: IndexAndTypes): IndexDefinition = IndexDefinition(IndexAndType(indexType.index, indexType.types.head))
 
     @deprecated("use indexStats(indexes)", "5.0.0")
-    def stats(indexes: Indexes): IndicesStatsDefinition = indexStats(indexes)
+    def stats(indexes: Indexes): IndexStatsRequest = indexStats(indexes)
 
     @deprecated("use indexStats(indexes)", "5.0.0")
-    def stats(first: String, rest: String*): IndicesStatsDefinition = indexStats(first +: rest)
+    def stats(first: String, rest: String*): IndexStatsRequest = indexStats(first +: rest)
   }
 
   case object flush {

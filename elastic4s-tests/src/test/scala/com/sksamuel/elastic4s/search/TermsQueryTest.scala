@@ -1,8 +1,8 @@
 package com.sksamuel.elastic4s.search
 
-import com.sksamuel.elastic4s.http.{ElasticDsl, HttpClient}
+import com.sksamuel.elastic4s.RefreshPolicy
+import com.sksamuel.elastic4s.http.ElasticDsl
 import com.sksamuel.elastic4s.testkit.DiscoveryLocalNodeProvider
-import com.sksamuel.elastic4s.{ElasticsearchClientUri, RefreshPolicy}
 import org.scalatest.{FlatSpec, Matchers}
 
 class TermsQueryTest
@@ -20,11 +20,20 @@ class TermsQueryTest
   }.await
 
   http.execute {
+    createIndex("lordsfanclub").mappings(
+      mapping("fans").fields(
+        keywordField("lordswelike")
+      )
+    )
+  }.await
+
+  http.execute {
     bulk(
       indexInto("lords/people") fields ("name" -> "nelson"),
       indexInto("lords/people") fields ("name" -> "edmure"),
       indexInto("lords/people") fields ("name" -> "umber"),
-      indexInto("lords/people") fields ("name" -> "byron")
+      indexInto("lords/people") fields ("name" -> "byron"),
+      indexInto("lordsfanclub/fans") fields ("lordswelike" -> List("nelson", "edmure")) id "lordsAppreciationFanClub"
     ).refresh(RefreshPolicy.Immediate)
   }.await
 
@@ -32,8 +41,20 @@ class TermsQueryTest
 
     val resp = http.execute {
       search("lords") query termsQuery("name", "nelson", "byron")
-    }.await.right.get
+    }.await.right.get.result
 
     resp.hits.hits.map(_.sourceAsString).toSet shouldBe Set("""{"name":"nelson"}""", """{"name":"byron"}""")
   }
+
+  it should "lookup terms to search from a document in another index" in {
+    val resp = http.execute {
+      search("lords") query termsQuery("name", List.empty[String])
+        .ref("lordsfanclub", "fans", "lordsAppreciationFanClub")
+        .path("lordswelike")
+    }.await.right.get.result
+
+    resp.hits.hits.map(_.sourceAsString).toSet shouldBe Set("""{"name":"nelson"}""", """{"name":"edmure"}""")
+  }
+
+
 }

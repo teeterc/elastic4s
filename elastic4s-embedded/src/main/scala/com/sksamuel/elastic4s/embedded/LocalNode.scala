@@ -4,7 +4,7 @@ import java.io.File
 import java.nio.file.{Path, Paths}
 
 import com.sksamuel.elastic4s.TcpClient
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.http.{HttpClient, HttpRequestClient}
 import com.sksamuel.exts.Logging
 import org.elasticsearch.client.Client
 import org.elasticsearch.common.settings.Settings
@@ -130,7 +130,14 @@ class InternalLocalNode(settings: Settings, plugins: List[Class[_ <: Plugin]])
     * If shutdownNodeOnClose is true, then the local node will be shutdown once this
     * client is closed. Otherwise you are required to manage the lifecycle of the local node yourself.
     */
-  override def http(shutdownNodeOnClose: Boolean): HttpClient = HttpClient(s"elasticsearch://$host:$port")
+  override def http(shutdownNodeOnClose: Boolean): HttpClient = new HttpClient {
+    private val delegate = HttpClient(s"elasticsearch://$host:$port")
+    override def client: HttpRequestClient = delegate.client
+    override def close(): Unit = {
+      if (shutdownNodeOnClose)
+        stop()
+    }
+  }
 }
 
 class LocalNodeTcpClient(node: InternalLocalNode, shutdownNodeOnClose: Boolean) extends TcpClient {
@@ -152,10 +159,10 @@ object LocalNode {
   // creates a LocalNode with all settings provided by the user
   // and using default plugins
   def apply(settings: Settings): InternalLocalNode = {
-    require(settings.getAsMap.containsKey("cluster.name"))
-    require(settings.getAsMap.containsKey("path.home"))
-    require(settings.getAsMap.containsKey("path.data"))
-    require(settings.getAsMap.containsKey("path.repo"))
+    require(settings.get("cluster.name") != null)
+    require(settings.get("path.home") != null)
+    require(settings.get("path.data") != null)
+    require(settings.get("path.repo") != null)
 
     val plugins = List(classOf[Netty4Plugin], classOf[MustachePlugin], classOf[PercolatorPlugin], classOf[ReindexPlugin])
 
@@ -169,7 +176,10 @@ object LocalNode {
   }
 
   // creates a LocalNode with all settings provided by the user
-  def apply(settings: Map[String, String]): InternalLocalNode = apply(Settings.builder().put(settings.asJava).build)
+  def apply(map: Map[String, String]): InternalLocalNode = {
+    val settings = map.foldLeft(Settings.builder) { case (builder, (key, value)) => builder.put(key, value) }.build()
+    apply(settings)
+  }
 
   // returns the minimum required settings to create a local node
   def requiredSettings(clusterName: String, homePath: String): Map[String, String] = {

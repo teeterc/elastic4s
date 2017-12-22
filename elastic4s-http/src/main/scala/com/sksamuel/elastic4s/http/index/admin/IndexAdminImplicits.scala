@@ -3,17 +3,14 @@ package com.sksamuel.elastic4s.http.index.admin
 import java.net.URLEncoder
 
 import com.sksamuel.elastic4s.admin._
-import com.sksamuel.elastic4s.http.index.{CreateIndexContentBuilder, CreateIndexResponse, IndexShowImplicits}
 import com.sksamuel.elastic4s.http.index.admin.IndexShardStoreResponse.StoreStatusResponse
-import com.sksamuel.elastic4s.http.update.RequestFailure
-import com.sksamuel.elastic4s.http.{HttpEntity, HttpExecutable, HttpRequestClient, HttpResponse, ResponseHandler}
+import com.sksamuel.elastic4s.http.index.{CreateIndexContentBuilder, CreateIndexResponse, IndexShowImplicits}
+import com.sksamuel.elastic4s.http.{ElasticError, HttpEntity, HttpExecutable, HttpRequestClient, HttpResponse, ResponseHandler}
 import com.sksamuel.elastic4s.indexes._
 import com.sksamuel.elastic4s.indexes.admin.{ForceMergeDefinition, IndexRecoveryDefinition}
-import com.sksamuel.exts.OptionImplicits._
 import org.apache.http.entity.ContentType
 
 import scala.concurrent.Future
-import scala.util.{Success, Try}
 
 trait IndexAdminImplicits extends IndexShowImplicits {
 
@@ -80,8 +77,8 @@ trait IndexAdminImplicits extends IndexShowImplicits {
   implicit object IndexExistsHttpExecutable extends HttpExecutable[IndexExistsDefinition, IndexExistsResponse] {
 
     override def responseHandler: ResponseHandler[IndexExistsResponse] = new ResponseHandler[IndexExistsResponse] {
-      override def handle(response: HttpResponse): Try[IndexExistsResponse] = {
-        Success(IndexExistsResponse(response.statusCode == 200))
+      override def handle(resp: HttpResponse) = {
+        Right(IndexExistsResponse(resp.statusCode == 200))
       }
     }
 
@@ -91,17 +88,22 @@ trait IndexAdminImplicits extends IndexShowImplicits {
     }
   }
 
+  implicit object GetSegmentHttpExecutable extends HttpExecutable[GetSegmentsDefinition, GetSegmentsResponse] {
+    override def execute(client: HttpRequestClient, request: GetSegmentsDefinition): Future[HttpResponse] = {
+      val endpoint = if (request.indexes.isAll) "/_segments" else s"/${request.indexes.string}/_segments"
+      client.async("GET", endpoint, Map("verbose" -> "true"))
+    }
+  }
+
   implicit object TypeExistsHttpExecutable extends HttpExecutable[TypesExistsDefinition, TypeExistsResponse] {
+
+    override def responseHandler: ResponseHandler[TypeExistsResponse] = new ResponseHandler[TypeExistsResponse] {
+      override def handle(response: HttpResponse) = Right(TypeExistsResponse(response.statusCode == 200))
+    }
 
     override def execute(client: HttpRequestClient, request: TypesExistsDefinition): Future[HttpResponse] = {
       val endpoint = s"/${request.indexes.mkString(",")}/_mapping/${request.types.mkString(",")}"
       client.async("HEAD", endpoint, Map.empty)
-    }
-
-    override def responseHandler: ResponseHandler[TypeExistsResponse] = new ResponseHandler[TypeExistsResponse] {
-      override def handle(resp: HttpResponse): Try[TypeExistsResponse] = {
-        Success(TypeExistsResponse(resp.statusCode == 200))
-      }
     }
   }
 
@@ -113,8 +115,8 @@ trait IndexAdminImplicits extends IndexShowImplicits {
     }
 
     override def responseHandler: ResponseHandler[AliasExistsResponse] = new ResponseHandler[AliasExistsResponse] {
-      override def handle(resp: HttpResponse): Try[AliasExistsResponse] = {
-        Success(AliasExistsResponse(resp.statusCode == 200))
+      override def handle(resp: HttpResponse) = {
+        Right(AliasExistsResponse(resp.statusCode == 200))
       }
     }
   }
@@ -140,12 +142,12 @@ trait IndexAdminImplicits extends IndexShowImplicits {
     }
   }
 
-  implicit object CreateIndexHttpExecutable extends HttpExecutable[CreateIndexDefinition, Either[RequestFailure, CreateIndexResponse]] {
+  implicit object CreateIndexHttpExecutable extends HttpExecutable[CreateIndexDefinition, CreateIndexResponse] {
 
-    override def responseHandler = new ResponseHandler[Either[RequestFailure, CreateIndexResponse]] {
-      override def doit(response: HttpResponse): Either[RequestFailure, CreateIndexResponse] = response.statusCode match {
-        case 200 | 201 => Right(ResponseHandler.fromEntity[CreateIndexResponse](response.entity.getOrError("Create index responses must have a body")))
-        case 400 | 500 => Left(RequestFailure.fromResponse(response))
+    override def responseHandler = new ResponseHandler[CreateIndexResponse] {
+      override def handle(response: HttpResponse): Either[ElasticError, CreateIndexResponse] = response.statusCode match {
+        case 200 | 201 => Right(ResponseHandler.fromResponse[CreateIndexResponse](response))
+        case 400 | 500 => Left(ElasticError.parse(response))
         case _ => sys.error(response.toString)
       }
     }

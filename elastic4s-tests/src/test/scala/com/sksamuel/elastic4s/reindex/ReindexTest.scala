@@ -42,37 +42,37 @@ class ReindexTest extends WordSpec with Matchers with ElasticDsl with DiscoveryL
     "copy from one index to another" in {
       http.execute {
         reindex("reindex", "reindextarget").refresh(RefreshPolicy.IMMEDIATE)
-      }.await.right.get.created shouldBe 3
+      }.await.right.get.result.created shouldBe 3
 
       http.execute {
         search("reindextarget")
-      }.await.right.get.size shouldBe 3
+      }.await.right.get.result.size shouldBe 3
     }
     "support size parameter" in {
 
-      delete("reindextarget")
+      deleteIdx("reindextarget")
       create("reindextarget")
 
       http.execute {
         reindex("reindex", "reindextarget").size(2).refresh(RefreshPolicy.IMMEDIATE)
-      }.await.right.get.created shouldBe 2
+      }.await.right.get.result.created shouldBe 2
 
       http.execute {
         search("reindextarget")
-      }.await.right.get.size shouldBe 2
+      }.await.right.get.result.size shouldBe 2
     }
     "support multiple sources" in {
 
-      delete("reindextarget")
+      deleteIdx("reindextarget")
       create("reindextarget")
 
       http.execute {
         reindex(Seq("reindex", "reindex2"), "reindextarget").refresh(RefreshPolicy.IMMEDIATE)
-      }.await.right.get.created shouldBe 4
+      }.await.right.get.result.created shouldBe 4
 
       http.execute {
         search("reindextarget")
-      }.await.right.get.size shouldBe 4
+      }.await.right.get.result.size shouldBe 4
     }
     "return failure for index not found" in {
       http.execute {

@@ -27,12 +27,14 @@ case class Indexes(values: Seq[String]) {
   def size: Int = values.size
   def isEmpty: Boolean = values.isEmpty
   def isNonEmpty: Boolean = values.nonEmpty
+  def isAll = values == Seq("_all")
   def string = if (values.isEmpty) "_all" else values.map(URLEncoder.encode).mkString(",")
   def array: Array[String] = values.toArray
 }
 
 object Indexes {
   val All = Indexes("_all")
+  val Empty = Indexes(Nil)
   implicit def apply(indexes: String): Indexes = Indexes(indexes.split(','))
   def apply(first: String, rest: String*): Indexes = Indexes(first +: rest)
   implicit def apply(indexes: Iterable[String]): Indexes = Indexes(indexes.toSeq)

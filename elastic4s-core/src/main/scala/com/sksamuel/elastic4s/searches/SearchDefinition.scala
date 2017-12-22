@@ -59,7 +59,10 @@ case class SearchDefinition(indexesTypes: IndexesAndTypes,
                             meta: Meta = Meta(),
                             searchType: Option[SearchType] = None,
                             searchAfter: Seq[AnyRef] = Nil,
-                            version: Option[Boolean] = None) {
+                            version: Option[Boolean] = None,
+                            profile: Option[Boolean] = None,
+                            source: Option[String] = None,
+                            trackHits: Option[Boolean] = None) {
 
   /** Adds a single string query to this search
     *
@@ -110,6 +113,8 @@ case class SearchDefinition(indexesTypes: IndexesAndTypes,
   def sortByFieldAsc(name: String): SearchDefinition = sortBy(FieldSortDefinition(name))
 
   def sortByFieldDesc(name: String): SearchDefinition = sortBy(FieldSortDefinition(name).desc())
+
+  def trackTotalHits(value: Boolean): SearchDefinition = copy(trackHits = Some(value))
 
   /** This method introduces zero or more script field definitions into the search construction
     *
@@ -178,37 +183,26 @@ case class SearchDefinition(indexesTypes: IndexesAndTypes,
     */
   def rawQuery(json: String): SearchDefinition = query(RawQueryDefinition(json))
 
-  /** Sets the source of the request as a json string. Allows setting other parameters.
-    * Unlike rawQuery, setExtraSource is parsed at the "root" level
-    * Query must be valid json beginning with '{' and ending with '}'.
-    * Field names must be double quoted.
-    *
-    * Example:
-    * {{{
-    * search in "*" types("users", "tweets") limit 5 extraSource {
-    * """{ "query": { "prefix": { "bands": { "prefix": "coldplay", "boost": 5.0, "rewrite": "yes" } } } }"""
-    * } searchType SearchType.Scan
-    * }}}
-    */
-  def extraSource(json: String): SearchDefinition = ??? // todo
-
   /**
-    * Sets the source of the request as a json string. Note, setting anything other
-    * than the search type will cause this source to be overridden, consider using
-    * {@link #setExtraSource(String)}.
+    * Sets the source of the request as a json string. Note, if you use this method
+    * any other body-level settings will be ignored.
     *
-    * Unlike rawQuery, setExtraSource is parsed at the "root" level
+    * HTTP query-parameter settings can still be used, eg limit, routing, search type etc.
+    *
+    * Unlike rawQuery, source is parsed at the "root" level
     * Query must be valid json beginning with '{' and ending with '}'.
     * Field names must be double quoted.
     *
+    * NOTE: This method only works with the HTTP client.
+    *
     * Example:
     * {{{
-    * search in "*" types("users", "tweets") limit 5 extraSource {
+    * search in "*" types("users", "tweets") limit 5 source {
     * """{ "query": { "prefix": { "bands": { "prefix": "coldplay", "boost": 5.0, "rewrite": "yes" } } } }"""
     * } searchType SearchType.Scan
     * }}}
     */
-  def source(json: String): SearchDefinition = ??? // todo
+  def source(json: String): SearchDefinition = copy(source = json.some)
 
   def explain(enabled: Boolean): SearchDefinition = copy(meta = meta.copy(explain = enabled.some))
 

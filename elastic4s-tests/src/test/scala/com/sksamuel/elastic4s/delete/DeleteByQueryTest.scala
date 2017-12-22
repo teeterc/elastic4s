@@ -38,15 +38,15 @@ class DeleteByQueryTest extends WordSpec with Matchers with ElasticDsl with Disc
 
       http.execute {
         search(indexname).matchAllQuery()
-      }.await.right.get.totalHits shouldBe 4
+      }.await.right.get.result.totalHits shouldBe 4
 
       http.execute {
         deleteByQuery(indexname, indexname, matchQuery("name", "bumbles")).refresh(RefreshPolicy.Immediate)
-      }.await.right.get.deleted shouldBe 2
+      }.await.right.get.result.deleted shouldBe 2
 
       http.execute {
         search(indexname).matchAllQuery()
-      }.await.right.get.totalHits shouldBe 2
+      }.await.right.get.result.totalHits shouldBe 2
     }
     "return a Left[RequestFailure] when the delete fails" in {
       http.execute {

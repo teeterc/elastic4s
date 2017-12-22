@@ -43,7 +43,7 @@ class TermsAggregationHttpTest extends FreeSpec with DiscoveryLocalNodeProvider 
         search("termsagg/curry").matchAllQuery().aggs {
           termsAgg("agg1", "strength")
         }
-      }.await.right.get
+      }.await.right.get.result
       resp.totalHits shouldBe 4
 
       val agg = resp.aggregations.terms("agg1")
@@ -56,7 +56,7 @@ class TermsAggregationHttpTest extends FreeSpec with DiscoveryLocalNodeProvider 
         search("termsagg/curry").matchQuery("name", "masala").aggregations {
           termsAgg("agg1", "strength")
         }
-      }.await.right.get
+      }.await.right.get.result
       resp.size shouldBe 2
 
       val agg = resp.aggregations.terms("agg1")
@@ -69,7 +69,7 @@ class TermsAggregationHttpTest extends FreeSpec with DiscoveryLocalNodeProvider 
         search("termsagg/curry").aggregations {
           termsAggregation("agg1") field "origin" missing "unknown"
         }
-      }.await.right.get
+      }.await.right.get.result
       resp.totalHits shouldBe 4
 
       val agg = resp.aggs.terms("agg1")
@@ -82,7 +82,7 @@ class TermsAggregationHttpTest extends FreeSpec with DiscoveryLocalNodeProvider 
         search("termsagg/curry").aggregations {
           termsAggregation("agg1") field "strength" minDocCount 2
         }
-      }.await.right.get
+      }.await.right.get.result
       resp.totalHits shouldBe 4
 
       val agg = resp.aggs.terms("agg1")
@@ -95,7 +95,7 @@ class TermsAggregationHttpTest extends FreeSpec with DiscoveryLocalNodeProvider 
         search("termsagg/curry").aggregations {
           termsAggregation("agg1") field "strength" size 1
         }
-      }.await.right.get
+      }.await.right.get.result
       resp.totalHits shouldBe 4
 
       val agg = resp.aggs.terms("agg1")
@@ -110,7 +110,7 @@ class TermsAggregationHttpTest extends FreeSpec with DiscoveryLocalNodeProvider 
             termsAgg("agg2", "origin")
           )
         }
-      }.await.right.get
+      }.await.right.get.result
       resp.totalHits shouldBe 4
 
       val agg = resp.aggregations.terms("agg1")
@@ -122,7 +122,7 @@ class TermsAggregationHttpTest extends FreeSpec with DiscoveryLocalNodeProvider 
         search("termsagg/curry").matchAllQuery().aggs {
           termsAgg("agg1", "strength").order(TermsOrder("_count", false))
         }
-      }.await.right.get
+      }.await.right.get.result
 
       val agg = resp.aggregations.terms("agg1")
       agg.buckets.map(_.key) shouldBe List("hot", "medium", "mild")
@@ -133,10 +133,36 @@ class TermsAggregationHttpTest extends FreeSpec with DiscoveryLocalNodeProvider 
         search("termsagg/curry").matchAllQuery().aggs {
           termsAgg("agg1", "strength").order(TermsOrder("_count", true))
         }
-      }.await.right.get
+      }.await.right.get.result
 
       val agg = resp.aggregations.terms("agg1")
       agg.buckets.map(_.key) shouldBe List("medium", "mild", "hot")
+    }
+
+    "sould support multi criteria order" in {
+      val resp = http.execute {
+        search("termsagg/curry").matchAllQuery().aggs {
+          termsAgg("agg1", "strength").order(TermsOrder("_count", true), TermsOrder("_key", false))
+        }
+      }.await.right.get.result
+
+      val agg = resp.aggregations.terms("agg1")
+      agg.buckets.map(_.key) shouldBe List("mild", "medium", "hot")
+    }
+
+    "should support partitioning" in {
+      val numPartitions = 20
+      val responses = (0 until numPartitions).map { i =>
+        http.execute {
+          search("termsagg/curry").matchAllQuery().aggs {
+            termsAgg("agg1", "strength").includePartition(i, numPartitions)
+          }
+        }.await.right.get.result
+      }
+      responses.map(_.totalHits) should contain only (4)
+
+      val aggs = responses.map(_.aggregations.terms("agg1"))
+      aggs.flatMap(_.buckets).map(_.copy(data = Map.empty)).toSet shouldBe Set(TermBucket("hot", 2, Map.empty), TermBucket("medium", 1, Map.empty), TermBucket("mild", 1, Map.empty))
     }
   }
 }

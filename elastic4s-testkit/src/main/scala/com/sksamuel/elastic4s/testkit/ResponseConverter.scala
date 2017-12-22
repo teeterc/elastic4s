@@ -5,6 +5,7 @@ import java.util.Locale
 
 import com.sksamuel.elastic4s.bulk.RichBulkResponse
 import com.sksamuel.elastic4s.get.{RichGetResponse, RichMultiGetResponse}
+import com.sksamuel.elastic4s.http.Shards
 import com.sksamuel.elastic4s.http.bulk.{BulkResponse, BulkResponseItem, BulkResponseItems}
 import com.sksamuel.elastic4s.http.cluster.ClusterHealthResponse
 import com.sksamuel.elastic4s.http.delete.DeleteByQueryResponse
@@ -14,9 +15,8 @@ import com.sksamuel.elastic4s.http.index._
 import com.sksamuel.elastic4s.http.index.admin._
 import com.sksamuel.elastic4s.http.index.mappings.PutMappingResponse
 import com.sksamuel.elastic4s.http.search.{ClearScrollResponse, SearchHit, SearchHits}
-import com.sksamuel.elastic4s.http.update.{UpdateByQueryResponse, UpdateResponse}
+import com.sksamuel.elastic4s.http.update.{UpdateByQueryResponse, UpdateGet, UpdateResponse}
 import com.sksamuel.elastic4s.http.validate.ValidateResponse
-import com.sksamuel.elastic4s.http.values.Shards
 import com.sksamuel.elastic4s.index.RichIndexResponse
 import com.sksamuel.elastic4s.searches.{ClearScrollResult, RichSearchResponse}
 import com.sksamuel.elastic4s.update.RichUpdateResponse
@@ -118,18 +118,20 @@ object ResponseConverterImplicits {
             x.id,
             x.index,
             x.`type`,
+            x.version,
             x.score,
             None,
             None, // TODO
+            None,
+            None,
+            None,
             x.sourceAsMap.asScalaNested,
             x.fields.mapValues(_.value),
             x.highlightFields.mapValues(_.fragments.map(_.string)),
-            inner_hits = Map.empty,// TODO: Set properly
-            x.version
+            inner_hits = Map.empty// TODO: Set properly
           )
         }
-      ),
-      ""
+      )
     )
   }
 
@@ -269,7 +271,8 @@ object ResponseConverterImplicits {
         response.version,
         response.result.getLowercase,
         response.original.forcedRefresh(),
-        Shards(shardInfo.getTotal, shardInfo.getFailed, shardInfo.getSuccessful)
+        Shards(shardInfo.getTotal, shardInfo.getFailed, shardInfo.getSuccessful),
+        Option(UpdateGet(true, Map.empty))
       )
     }
   }

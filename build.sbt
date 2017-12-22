@@ -22,9 +22,10 @@ lazy val root = Project("elastic4s", file("."))
     json4s,
     playjson,
     sprayjson,
-    httpstreams
-    // streams,
-    //  xpacksecurity
+    aws,
+    httpstreams,
+//    streams,
+    xpacksecurity
   )
 
 lazy val core = Project("elastic4s-core", file("elastic4s-core"))
@@ -84,12 +85,12 @@ lazy val http = Project("elastic4s-http", file("elastic4s-http"))
   )
   .dependsOn(core)
 
-//lazy val xpacksecurity = Project("elastic4s-xpack-security", file("elastic4s-xpack-security"))
-//  .settings(
-//    name := "elastic4s-xpack-security",
-//    resolvers += "elastic" at "https://artifacts.elastic.co/maven",
-//    libraryDependencies += "org.elasticsearch.client" % "x-pack-transport" % ElasticsearchVersion
-//  ).dependsOn(tcp)
+lazy val xpacksecurity = Project("elastic4s-xpack-security", file("elastic4s-xpack-security"))
+  .settings(
+    name := "elastic4s-xpack-security",
+    resolvers += "elastic" at "https://artifacts.elastic.co/maven",
+    libraryDependencies += "org.elasticsearch.client" % "x-pack-transport" % ElasticsearchVersion
+  ).dependsOn(tcp)
 
 lazy val embedded = Project("elastic4s-embedded", file("elastic4s-embedded"))
   .settings(
@@ -163,6 +164,12 @@ lazy val sprayjson = Project("elastic4s-spray-json", file("elastic4s-spray-json"
     libraryDependencies += "io.spray" %% "spray-json" % SprayJsonVersion
   ).dependsOn(core)
 
+lazy val aws = Project("elastic4s-aws", file("elastic4s-aws"))
+  .settings(
+    name := "elastic4s-aws",
+    libraryDependencies += "com.amazonaws" % "aws-java-sdk-core" % AWSJavaSdkVersion
+  ).dependsOn(core, http)
+
 lazy val tests = Project("elastic4s-tests", file("elastic4s-tests"))
   .settings(
     name := "elastic4s-tests",
@@ -181,7 +188,7 @@ lazy val tests = Project("elastic4s-tests", file("elastic4s-tests"))
     parallelExecution in Test := false,
     testForkedParallel in Test := false
   )
-  .dependsOn(tcp, http, jackson, circe, testkit % "test")
+  .dependsOn(tcp, http, jackson, circe, aws, testkit % "test")
 
 lazy val docsMappingsAPIDir = settingKey[String]("Name of subdirectory in site target directory for api docs")
 
@@ -222,7 +229,7 @@ lazy val docs = project
     includeFilter in makeSite := "*.html" | "*.css" | "*.png" | "*.jpg" | "*.gif" | "*.js" | "*.swf" | "*.yml" | "*.md",
     // push microsite on release
     releaseProcess += releaseStepTask(publishMicrosite)
-  ).dependsOn(core, embedded, http, circe)
+  ).dependsOn(core, embedded, http, circe, aws)
 
 lazy val noPublishSettings = Seq(
   publish := (),

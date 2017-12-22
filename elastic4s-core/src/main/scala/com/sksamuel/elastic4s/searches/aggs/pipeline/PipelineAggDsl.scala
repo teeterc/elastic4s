@@ -9,9 +9,14 @@ trait PipelineAggregationApi {
   def avgBucketAggregation(name: String,
                            bucketsPath: String): AvgBucketDefinition = AvgBucketDefinition(name, bucketsPath)
 
+  def bucketSelectorAggregation(name: String,
+                                script: ScriptDefinition,
+                                bucketsPathMap: Map[String,String]): BucketSelectorDefinition =
+    BucketSelectorDefinition(name, script, bucketsPathMap)
+
   def bucketScriptAggregation(name: String,
                               script: ScriptDefinition,
-                              bucketsPath: Seq[String]): BucketScriptDefinition =
+                              bucketsPath: Map[String,String]): BucketScriptDefinition =
     BucketScriptDefinition(name, script, bucketsPath)
 
   def cumulativeSumAggregation(name: String,

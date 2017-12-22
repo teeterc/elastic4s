@@ -1,18 +1,17 @@
 package com.sksamuel.elastic4s.http
 
-import java.nio.charset.Charset
-
 import com.fasterxml.jackson.databind.JsonNode
 import com.sksamuel.elastic4s.json.JacksonSupport
 import com.sksamuel.exts.Logging
-
-import scala.io.Codec
-import scala.util.{Failure, Try}
+import com.sksamuel.exts.OptionImplicits._
 
 trait ResponseHandler[U] {
-  def handle(response: HttpResponse): Try[U] = Try(doit(response))
-  def doit(response: HttpResponse): U = ???
-  protected def handleError(response: HttpResponse): Failure[U] = Failure(new RuntimeException(response.entity.map(_.content).getOrElse("no error message")))
+
+  /**
+    * Accepts a HttpResponse and returns an Either of an ElasticError or a type specific to the request
+    * as determined by the instance of this handler.
+    */
+  def handle(response: HttpResponse): Either[ElasticError, U]
 }
 
 // a ResponseHandler that marshalls the body into the required type using Jackson
@@ -20,20 +19,17 @@ trait ResponseHandler[U] {
 // if the content encoding header is null, then UTF-8 is assumed
 object ResponseHandler extends Logging {
 
-  def json(entity: HttpEntity): JsonNode = fromEntity[JsonNode](entity)
+  def json(entity: HttpEntity.StringEntity): JsonNode = fromEntity[JsonNode](entity)
 
   def fromNode[U: Manifest](node: JsonNode): U = {
     logger.debug(s"Attempting to unmarshall json node to ${manifest.runtimeClass.getName}")
-    implicit val codec = Codec(Charset.defaultCharset)
     JacksonSupport.mapper.readValue[U](JacksonSupport.mapper.writeValueAsBytes(node))
   }
 
-  def fromResponse[U: Manifest](response: HttpResponse): U = fromEntity(response.entity.get)
+  def fromResponse[U: Manifest](response: HttpResponse): U = fromEntity(response.entity.getOrError("No entity defined but was expected"))
 
-  def fromEntity[U: Manifest](entity: HttpEntity): U = {
+  def fromEntity[U: Manifest](entity: HttpEntity.StringEntity): U = {
     logger.debug(s"Attempting to unmarshall response to ${manifest.runtimeClass.getName}")
-    val charset = entity.contentType.getOrElse("UTF-8")
-    implicit val codec = Codec(Charset.forName(charset))
     logger.debug(entity.content)
     JacksonSupport.mapper.readValue[U](entity.content)
   }
@@ -42,14 +38,21 @@ object ResponseHandler extends Logging {
   def failure404[U: Manifest] = new NotFound404ResponseHandler[U]
 }
 
+// standard response handler, 200-204s are ok, and everything else is marhalled into an error
 class DefaultResponseHandler[U: Manifest] extends ResponseHandler[U] {
-  override def handle(response: HttpResponse): Try[U] = Try(ResponseHandler.fromEntity[U](response.entity.get))
+  override def handle(response: HttpResponse): Either[ElasticError, U] = response.statusCode match {
+    case 200 | 201 | 202 | 203 | 204 =>
+      val entity = response.entity.getOrError("No entity defined")
+      Right(ResponseHandler.fromEntity[U](entity))
+    case _ =>
+      Left(ElasticError.parse(response))
+  }
 }
 
 class NotFound404ResponseHandler[U: Manifest] extends DefaultResponseHandler[U] {
-  override def handle(response: HttpResponse): Try[U] = {
+  override def handle(response: HttpResponse): Either[ElasticError, U] = {
     response.statusCode match {
-      case 404 | 500 => Failure(new RuntimeException(response.entity.map(_.content).getOrElse("no error message")))
+      case 404 | 500 => sys.error(response.toString)
       case _ => super.handle(response)
     }
   }

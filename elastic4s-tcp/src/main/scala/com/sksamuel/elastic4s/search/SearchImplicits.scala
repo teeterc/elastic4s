@@ -63,6 +63,7 @@ trait SearchImplicits {
       search.control.timeout.map(dur => TimeValue.timeValueNanos(dur.toNanos)).foreach(builder.timeout)
       search.indexBoosts.foreach { case (index, boost) => builder.indexBoost(index, boost.toFloat) }
       search.collapse.foreach(c => builder.collapse(CollapseBuilderFn.apply(c)))
+      search.profile.foreach(builder.profile)
 
       if (search.fields.storedFields.nonEmpty)
         builder.storedFields(search.fields.storedFields.asJava)
@@ -112,8 +113,6 @@ trait SearchImplicits {
         val highlightBuilder = HighlightBuilderFn(highlight.options, highlight.fields.toSeq)
         builder.highlighter(highlightBuilder)
       }
-
-      search.scoring.rescorers.map(RescoreBuilderFn.apply).foreach(builder.addRescorer)
 
       if (search.meta.stats.nonEmpty)
         builder.stats(search.meta.stats.asJava)

@@ -2,22 +2,24 @@ package com.sksamuel.elastic4s.http.search
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.sksamuel.elastic4s.get.HitField
-import com.sksamuel.elastic4s.http.SourceAsContentBuilder
 import com.sksamuel.elastic4s.http.explain.Explanation
-import com.sksamuel.elastic4s.http.values.Shards
-import com.sksamuel.elastic4s.{Hit, HitReader}
+import com.sksamuel.elastic4s.http.{Shards, SourceAsContentBuilder}
+import com.sksamuel.elastic4s.{AggReader, Hit, HitReader}
 
 case class SearchHit(@JsonProperty("_id") id: String,
                      @JsonProperty("_index") index: String,
                      @JsonProperty("_type") `type`: String,
+                     @JsonProperty("_version") version: Long,
                      @JsonProperty("_score") score: Float,
                      @JsonProperty("_parent") parent: Option[String],
+                     @JsonProperty("_shard") shard: Option[String],
+                     @JsonProperty("_node") node: Option[String],
+                     @JsonProperty("_routing") routing: Option[String],
                      @JsonProperty("_explanation") explanation: Option[Explanation],
                      private val _source: Map[String, AnyRef],
                      fields: Map[String, AnyRef],
                      highlight: Map[String, Seq[String]],
-                     private val inner_hits: Map[String, Map[String, Any]],
-                     @JsonProperty("_version") version: Long) extends Hit {
+                     private val inner_hits: Map[String, Map[String, Any]]) extends Hit {
 
   def highlightFragments(name: String): Seq[String] = Option(highlight).getOrElse(Map.empty).getOrElse(name, Nil)
 
@@ -39,7 +41,8 @@ case class SearchHit(@JsonProperty("_id") id: String,
 
   override def exists: Boolean = true
 
-  def innerHits: Map[String, InnerHits] = Option(inner_hits).getOrElse(Map.empty).mapValues { hits =>
+  private def buildInnerHits(_hits: Map[String, Map[String, Any]]): Map[String, InnerHits] =
+    Option(_hits).getOrElse(Map.empty).mapValues { hits =>
       val v = hits("hits").asInstanceOf[Map[String, AnyRef]]
       InnerHits(
         total = v("total").toString.toLong,
@@ -49,12 +52,15 @@ case class SearchHit(@JsonProperty("_id") id: String,
             nested = hits.get("_nested").map(_.asInstanceOf[Map[String, AnyRef]]).getOrElse(Map.empty),
             score = hits("_score").asInstanceOf[Double],
             source = hits("_source").asInstanceOf[Map[String, AnyRef]],
+            innerHits = buildInnerHits(hits.getOrElse("inner_hits", null).asInstanceOf[Map[String, Map[String, Any]]]),
             highlight = hits.get("highlight").map(_.asInstanceOf[Map[String, Seq[String]]]).getOrElse(Map.empty),
             sort = hits.get("sort").map(_.asInstanceOf[Seq[AnyRef]]).getOrElse(Seq.empty)
           )
         }
       )
-  }
+    }
+
+  def innerHits: Map[String, InnerHits] = buildInnerHits(inner_hits)
 }
 
 case class SearchHits(total: Long,
@@ -72,6 +78,7 @@ case class InnerHits(total: Long,
 case class InnerHit(nested: Map[String, AnyRef],
                     score: Double,
                     source: Map[String, AnyRef],
+                    innerHits: Map[String, InnerHits],
                     highlight: Map[String, Seq[String]],
                     sort: Seq[AnyRef])
 
@@ -82,8 +89,7 @@ case class SearchResponse(took: Long,
                           @JsonProperty("_shards") shards: Shards,
                           @JsonProperty("_scroll_id") scrollId: Option[String],
                           @JsonProperty("aggregations") aggregationsAsMap: Map[String, Any],
-                          hits: SearchHits,
-                          json: String // the underlying json used to generate this search response
+                          hits: SearchHits
                          ) {
 
   def totalHits: Long = hits.total
@@ -94,7 +100,8 @@ case class SearchResponse(took: Long,
   def isEmpty: Boolean = hits.isEmpty
   def nonEmpty: Boolean = hits.nonEmpty
 
-  def aggregationsAsString: String = SourceAsContentBuilder(aggregationsAsMap).string()
+  lazy val aggsAsContentBuilder = SourceAsContentBuilder(aggregationsAsMap)
+  lazy val aggregationsAsString: String = aggsAsContentBuilder.string()
   def aggs: Aggregations = aggregations
   def aggregations: Aggregations = Aggregations(aggregationsAsMap)
 
